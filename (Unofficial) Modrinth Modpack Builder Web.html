@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>(Unofficial) Modrinth Modpack Builder Web</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #111111;
+            --surface-color: #1e1e1e;
+            --surface-hover: #2a2a2a;
+            --primary-color: #1bd96a;
+            --primary-hover: #17b858;
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
+            --border-color: #333333;
+            --danger: #ff4a4a;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--surface-color);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .logo {
+            font-weight: 900;
+            font-size: 1.2rem;
+            color: var(--primary-color);
+            margin-right: 1.5rem;
+            letter-spacing: -0.5px;
+            white-space: nowrap;
+        }
+
+        input[type="text"], select {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus, select:focus {
+            border-color: var(--primary-color);
+        }
+
+        input[type="text"] {
+            flex-grow: 1;
+            max-width: 500px;
+        }
+
+        select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        main {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        #results-container {
+            flex-grow: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            align-content: start;
+        }
+
+        .card {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            border-color: #444;
+        }
+
+        .card-header {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .card-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            background-color: var(--bg-color);
+            object-fit: cover;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .card-author {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin: 0.2rem 0 0 0;
+        }
+
+        .card-author a {
+            color: inherit;
+            text-decoration: underline;
+        }
+
+        .card-desc {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.4;
+            flex-grow: 1;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: auto;
+        }
+
+        button {
+            background-color: var(--surface-hover);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            flex-grow: 1;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #3a3a3a;
+        }
+
+        button.primary {
+            background-color: var(--primary-color);
+            color: #000;
+            border: none;
+        }
+
+        button.primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        #sidebar {
+            width: 350px;
+            background-color: var(--surface-color);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        #pack-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .pack-item {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            padding: 0.8rem;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .remove-btn {
+            background: none;
+            border: none;
+            color: var(--danger);
+            cursor: pointer;
+            padding: 0.2rem 0.5rem;
+            flex-grow: 0;
+        }
+
+        footer {
+            background-color: var(--surface-color);
+            padding: 0.8rem 2rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-align: center;
+            line-height: 1.4;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        #loader {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 40%;
+            transform: translate(-50%, -50%);
+            color: var(--text-muted);
+        }
+
+        .load-more-btn {
+            grid-column: 1 / -1;
+            padding: 1rem;
+            background-color: var(--surface-color);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">(Unofficial) Modrinth Modpack Builder Web</div>
+        <input type="text" id="searchInput" placeholder="Search mods...">
+        
+        <label style="font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; white-space: nowrap;">
+            <input type="checkbox" id="releasesCheck"> Releases Only
+        </label>
+        
+        <select id="versionSelect"><option value="">Loading versions...</option></select>
+        <select id="loaderSelect"><option value="">Loading loaders...</option></select>
+    </header>
+
+    <main>
+        <div id="loader">Searching...</div>
+        <div id="results-container"></div>
+
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <h2 style="margin:0">My Modpack</h2>
+                <p id="pack-status" style="font-size:0.8rem; color:var(--text-muted); margin:0.5rem 0 0 0;">Ready to build.</p>
+            </div>
+            <div id="pack-list"></div>
+            <div style="padding: 1.5rem; border-top: 1px solid var(--border-color);">
+                <button class="primary" id="exportBtn" style="width: 100%;">Export .mrpack</button>
+            </div>
+        </aside>
+    </main>
+
+    <footer>
+        <p>
+            <b>Disclaimer:</b> I am not a part of the Modrinth team. This is an unofficial tool. 
+            Modrinth and its branding are trademarks of Rinth, Inc. Data provided by the Modrinth API.
+        </p>
+        <p>
+            Project Repository: <a href="https://github.com/Johndinglesin/Unofficial-Modrinth-Modpack-Builder-Web.git" target="_blank">Johndinglesin/Unofficial-Modrinth-Modpack-Builder-Web</a>
+            | If you have a bug to report or an idea to add to this site please go fill out this form <a href="https://forms.gle/9XfC18BjfsFwDACb6" target="_blank">here</a>.
+        </p>
+    </footer>
+
+    <script>
+        let debounceTimer;
+        let modpack = [];
+        let lockedVersion = null;
+        let lockedLoader = null;
+        let offset = 0;
+        let allGameVersions = [];
+
+        const searchInput = document.getElementById('searchInput');
+        const releasesCheck = document.getElementById('releasesCheck');
+        const versionSelect = document.getElementById('versionSelect');
+        const loaderSelect = document.getElementById('loaderSelect');
+        const resultsContainer = document.getElementById('results-container');
+        const packList = document.getElementById('pack-list');
+        const packStatus = document.getElementById('pack-status');
+        const exportBtn = document.getElementById('exportBtn');
+        const loaderSpinner = document.getElementById('loader');
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => performSearch(false), 300);
+        });
+
+        releasesCheck.addEventListener('change', populateVersions);
+        versionSelect.addEventListener('change', () => performSearch(false));
+        loaderSelect.addEventListener('change', () => performSearch(false));
+        exportBtn.addEventListener('click', exportModpack);
+
+        async function initializeOptions() {
+            try {
+                const [loaderRes, versionRes] = await Promise.all([
+                    fetch('https://api.modrinth.com/v2/tag/loader'),
+                    fetch('https://api.modrinth.com/v2/tag/game_version')
+                ]);
+
+                const loaders = await loaderRes.json();
+                loaderSelect.innerHTML = '';
+                loaders.filter(l => l.supported_project_types.includes('mod')).forEach(l => {
+                    const opt = document.createElement('option');
+                    opt.value = l.name;
+                    opt.innerText = l.name.charAt(0).toUpperCase() + l.name.slice(1);
+                    if(l.name === 'fabric') opt.selected = true;
+                    loaderSelect.appendChild(opt);
+                });
+
+                allGameVersions = await versionRes.json();
+                populateVersions();
+                
+            } catch (error) {
+                console.error("Initialization failed:", error);
+            }
+        }
+
+        function populateVersions() {
+            const isReleasesOnly = releasesCheck.checked;
+            versionSelect.innerHTML = '';
+            let selectedAssigned = false;
+            
+            allGameVersions.forEach(v => {
+                if (isReleasesOnly && v.version_type !== 'release') return;
+                
+                const opt = document.createElement('option');
+                opt.value = v.version;
+                opt.innerText = v.version;
+                
+                
+                if(v.version === '1.21.1') {
+                    opt.selected = true;
+                    selectedAssigned = true;
+                }
+                versionSelect.appendChild(opt);
+            });
+            
+            if (!selectedAssigned && versionSelect.options.length > 0) {
+                versionSelect.options[0].selected = true;
+            }
+            
+            performSearch(false);
+        }
+
+        async function performSearch(append = false) {
+            const query = searchInput.value.trim();
+            const version = versionSelect.value;
+            const loader = loaderSelect.value;
+            if (!version || !loader) return;
+
+            if (!append) {
+                offset = 0;
+                resultsContainer.innerHTML = '';
+                loaderSpinner.style.display = 'block';
+            } else {
+                const oldBtn = resultsContainer.querySelector('.load-more-btn');
+                if (oldBtn) oldBtn.remove();
+            }
+
+            const facets = JSON.stringify([[`categories:${loader}`], [`versions:${version}`], ["project_type:mod"]]);
+            const url = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(facets)}&limit=24&offset=${offset}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                renderResults(data.hits);
+            } catch (error) {
+                if (!append) resultsContainer.innerHTML = `<p>Search failed. Please try again.</p>`;
+            } finally {
+                loaderSpinner.style.display = 'none';
+            }
+        }
+
+        function renderResults(mods) {
+            if (mods.length === 0 && offset === 0) {
+                resultsContainer.innerHTML = '<p>No results found.</p>';
+                return;
+            }
+            
+            mods.forEach(mod => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <img src="${mod.icon_url || ''}" class="card-icon" onerror="this.src='https://docs.modrinth.com/img/logo.svg'">
+                        <div>
+                            <h3 class="card-title"><a href="https://modrinth.com/mod/${mod.slug}" target="_blank" style="color: inherit; text-decoration: none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${mod.title}</a></h3>
+                            <p class="card-author">by <a href="https://modrinth.com/user/${mod.author}" target="_blank">${mod.author}</a></p>
+                        </div>
+                    </div>
+                    <div class="card-desc">${mod.description}</div>
+                    <div class="card-actions">
+                        <button onclick="downloadDirectly('${mod.project_id}')">Download</button>
+                        <button class="primary" onclick="addToPack('${mod.project_id}', '${mod.title.replace(/'/g, "\\'")}', '${mod.icon_url || ''}')">Add to Pack</button>
+                    </div>
+                `;
+                resultsContainer.appendChild(card);
+            });
+
+            
+            if (mods.length === 24) {
+                const loadMoreBtn = document.createElement('button');
+                loadMoreBtn.className = 'load-more-btn';
+                loadMoreBtn.innerText = 'Load More Mods';
+                loadMoreBtn.onclick = () => {
+                    offset += 24;
+                    loadMoreBtn.innerText = 'Loading...';
+                    performSearch(true);
+                };
+                resultsContainer.appendChild(loadMoreBtn);
+            }
+        }
+
+        async function getModVersionData(projectId) {
+            const v = versionSelect.value;
+            const l = loaderSelect.value;
+            const response = await fetch(`https://api.modrinth.com/v2/project/${projectId}/version?loaders=["${l}"]&game_versions=["${v}"]`);
+            const data = await response.json();
+            return data.length > 0 ? data[0] : null;
+        }
+
+        async function downloadDirectly(projectId) {
+            const data = await getModVersionData(projectId);
+            if (!data || !data.files[0]) return alert("No compatible version found.");
+            const a = document.createElement('a');
+            a.href = data.files[0].url;
+            a.download = data.files[0].filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        async function addToPack(projectId, title, iconUrl) {
+            if (modpack.length === 0) {
+                lockedVersion = versionSelect.value;
+                lockedLoader = loaderSelect.value;
+                versionSelect.disabled = true;
+                loaderSelect.disabled = true;
+                packStatus.innerHTML = `Locked: <b>${lockedVersion} (${lockedLoader})</b>`;
+            }
+            if (modpack.some(m => m.projectId === projectId)) return alert("Already added.");
+            
+            const data = await getModVersionData(projectId);
+            if (!data) return alert("Version incompatible with pack constraints.");
+
+            const file = data.files[0];
+            modpack.push({
+                projectId, title, iconUrl,
+                fileObj: {
+                    path: `mods/${file.filename}`,
+                    hashes: { sha1: file.hashes.sha1, sha512: file.hashes.sha512 },
+                    env: { client: "required", server: "required" },
+                    downloads: [file.url],
+                    fileSize: file.size
+                }
+            });
+            renderPack();
+        }
+
+        function renderPack() {
+            packList.innerHTML = '';
+            modpack.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'pack-item';
+                div.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
+                        <img src="${m.iconUrl}" style="width: 24px; height: 24px; border-radius: 4px;" onerror="this.src='https://docs.modrinth.com/img/logo.svg'">
+                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.title}</span>
+                    </div>
+                    <button class="remove-btn" onclick="removeFromPack('${m.projectId}')">✕</button>
+                `;
+                packList.appendChild(div);
+            });
+        }
+
+        function removeFromPack(id) {
+            modpack = modpack.filter(m => m.projectId !== id);
+            if (modpack.length === 0) {
+                versionSelect.disabled = false;
+                loaderSelect.disabled = false;
+                packStatus.innerText = "Ready to build.";
+            }
+            renderPack();
+        }
+
+        async function exportModpack() {
+            if (modpack.length === 0) return alert("Pack is empty.");
+            const index = {
+                formatVersion: 1, game: "minecraft", versionId: "1.0.0",
+                name: "My Unofficial Pack",
+                dependencies: { "minecraft": lockedVersion },
+                files: modpack.map(m => m.fileObj)
+            };
+            const loaderKey = lockedLoader === 'fabric' ? 'fabric-loader' : (lockedLoader === 'quilt' ? 'quilt-loader' : lockedLoader);
+            index.dependencies[loaderKey] = "*";
+
+            const zip = new JSZip();
+            zip.file("modrinth.index.json", JSON.stringify(index, null, 2));
+            const content = await zip.generateAsync({type:"blob"});
+            saveAs(content, `pack-${lockedVersion}-${lockedLoader}.mrpack`);
+        }
+
+        initializeOptions();
+    </script>
+</body>
+</html>
