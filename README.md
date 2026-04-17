@@ -14,8 +14,6 @@ I am not affiliated, associated, authorized, endorsed by, or in any way official
 🙏 Acknowledgments
 A massive thank you to the Modrinth Team for providing such a robust and developer-friendly API. Without their commitment to open data and the Minecraft community, tools like this wouldn't be possible.
 
-Special thanks to Gemini (AI) for assisting with code review to ensure a smooth user experience.
-
 ⚖️ License
 This project is licensed under the Creative Commons Attribution 4.0 International (CC BY 4.0).
 
