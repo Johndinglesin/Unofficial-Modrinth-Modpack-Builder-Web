@@ -1,5 +1,5 @@
 Modrinth Modpack Builder Web (Unofficial)
-A lightweight, self-contained web interface designed to search for Minecraft mods and build custom modpacks directly from your browser. This tool uses the Modrinth API to fetch real-time data and exports .mrpack files that are fully compatible with the Modrinth App.
+A lightweight, self-contained web interface designed to search for Minecraft mods and build custom modpacks directly from your browser. This tool uses the Modrinth API to fetch real-time data and exports .mrpack files that are fully compatible with the Modrinth App. Now, With A special feature that when a mod has a dependency mod, it automatically adds it to the modpack.
 
 🔗 Links & Attribution
 Official Platform: https://modrinth.com/
