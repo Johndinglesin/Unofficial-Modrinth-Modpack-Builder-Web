@@ -297,6 +297,7 @@
             Project Repository: <a href="https://github.com/Johndinglesin/Unofficial-Modrinth-Modpack-Builder-Web.git" target="_blank">Johndinglesin/Unofficial-Modrinth-Modpack-Builder-Web</a>
             | If you have a bug to report or an idea to add to this site please go fill out this form <a href="https://forms.gle/9XfC18BjfsFwDACb6" target="_blank">here</a>.
         </p>
+        </div>
     </footer>
 
     <script>
@@ -363,7 +364,6 @@
                 const opt = document.createElement('option');
                 opt.value = v.version;
                 opt.innerText = v.version;
-                
                 
                 if(v.version === '1.21.1') {
                     opt.selected = true;
@@ -434,7 +434,6 @@
                 resultsContainer.appendChild(card);
             });
 
-            
             if (mods.length === 24) {
                 const loadMoreBtn = document.createElement('button');
                 loadMoreBtn.className = 'load-more-btn';
@@ -467,18 +466,40 @@
             document.body.removeChild(a);
         }
 
-        async function addToPack(projectId, title, iconUrl) {
-            if (modpack.length === 0) {
+        // Updated to handle dependencies automatically
+        async function addToPack(projectId, title, iconUrl, isDependency = false) {
+            if (modpack.length === 0 && !isDependency) {
                 lockedVersion = versionSelect.value;
                 lockedLoader = loaderSelect.value;
                 versionSelect.disabled = true;
                 loaderSelect.disabled = true;
                 packStatus.innerHTML = `Locked: <b>${lockedVersion} (${lockedLoader})</b>`;
             }
-            if (modpack.some(m => m.projectId === projectId)) return alert("Already added.");
+            
+            // Suppress alerts if we are quietly checking dependencies
+            if (modpack.some(m => m.projectId === projectId)) {
+                if (!isDependency) alert("Already added.");
+                return;
+            }
             
             const data = await getModVersionData(projectId);
-            if (!data) return alert("Version incompatible with pack constraints.");
+            if (!data) {
+                if (!isDependency) alert("Version incompatible with pack constraints.");
+                return;
+            }
+
+            // If we're adding a dependency, we likely don't have its title/icon yet. Let's fetch it.
+            if (!title) {
+                try {
+                    const res = await fetch(`https://api.modrinth.com/v2/project/${projectId}`);
+                    const projData = await res.json();
+                    title = projData.title;
+                    iconUrl = projData.icon_url || '';
+                } catch (e) {
+                    title = "Dependency (Unknown)";
+                    iconUrl = '';
+                }
+            }
 
             const file = data.files[0];
             modpack.push({
@@ -492,6 +513,16 @@
                 }
             });
             renderPack();
+
+            // Auto-resolve required dependencies
+            if (data.dependencies) {
+                for (const dep of data.dependencies) {
+                    // Only fetch dependencies marked as 'required' that provide a project_id
+                    if (dep.dependency_type === 'required' && dep.project_id) {
+                        await addToPack(dep.project_id, null, null, true);
+                    }
+                }
+            }
         }
 
         function renderPack() {
